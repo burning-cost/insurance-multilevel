@@ -130,7 +130,7 @@ print(lift["malr_improvement_pct"])  # e.g., 4.2% improvement
 ## Design Choices
 
 **Why two stages instead of joint estimation?**
-Joint approaches (GPBoost, MERF) are mathematically cleaner but have identifiability problems when group IDs are high-cardinality. If broker_id is in the CatBoost feature set, the tree can absorb *some* of the group signal, leaving underestimated τ² in Stage 2. Two-stage with group exclusion is simpler and avoids this. See KB entry 655 for the full argument.
+Joint approaches (GPBoost, MERF) are mathematically cleaner but have identifiability problems when group IDs are high-cardinality. If broker_id is in the CatBoost feature set, the tree can absorb *some* of the group signal, leaving underestimated τ² in Stage 2. Two-stage with group exclusion is simpler and avoids this.
 
 **Why REML instead of ML?**
 Maximum likelihood underestimates variance components because it doesn't account for the degrees of freedom consumed by fixed effects (the grand mean μ). REML conditions out μ first. For small numbers of groups (m < 30), the difference is material. For m > 100, ML and REML converge.
@@ -186,6 +186,21 @@ Dataclass holding σ², τ², k (Bühlmann), log-likelihood, convergence info.
 - Crossed effects excluded (broker × territory combinations)
 - One-way random effects per group column
 
-## License
+## Related libraries
+
+| Library | Why it's relevant |
+|---------|------------------|
+| [credibility](https://github.com/burning-cost/credibility) | Bühlmann-Straub closed-form implementation — use this when you don't need a GBM Stage 1 |
+| [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract rating relativities from the Stage 1 CatBoost model |
+| [insurance-spatial](https://github.com/burning-cost/insurance-spatial) | BYM2 spatial random effects for territory — the geographic equivalent of broker random effects |
+| [insurance-cv](https://github.com/burning-cost/insurance-cv) | Walk-forward cross-validation respecting IBNR structure, needed for validating the Stage 1 model |
+
+[All Burning Cost libraries →](https://burning-cost.github.io)
+
+## Read more
+
+[Your Broker Adjustments Are Guesswork](https://burning-cost.github.io/blog/your-broker-adjustments-are-guesswork) — why ad hoc broker loadings fail and how REML random effects give you defensible, data-driven credibility weights.
+
+## Licence
 
 MIT
