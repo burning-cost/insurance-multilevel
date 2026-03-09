@@ -43,6 +43,7 @@ dependencies = [
     "polars>=0.20",
     "catboost>=1.2",
     "scipy>=1.10",
+    "pyarrow>=23.0.1",
 ]
 
 [project.optional-dependencies]
@@ -66,3 +67,8 @@ addopts = "-v --tb=short"
 
 [tool.coverage.run]
 source = ["src/insurance_multilevel"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
