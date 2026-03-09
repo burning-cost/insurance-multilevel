@@ -1,4 +1,5 @@
 # insurance-multilevel
+[![Tests](https://github.com/burning-cost/insurance-multilevel/actions/workflows/tests.yml/badge.svg)](https://github.com/burning-cost/insurance-multilevel/actions/workflows/tests.yml)
 
 Two-stage CatBoost + REML random effects for insurance pricing with high-cardinality group factors.
 
