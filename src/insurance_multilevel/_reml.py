@@ -11,10 +11,18 @@ when the number of groups is small relative to sample size. REML conditions
 out the fixed effect (grand mean mu) before estimating variances, giving
 unbiased estimates.
 
-The REML log-likelihood for this model has a closed-form gradient and can
-be optimised efficiently with L-BFGS-B. We use Henderson's method-of-moments
-as the starting point — it converges instantly and gives good initial values
-even for unbalanced group structures.
+REML log-likelihood for one-way random effects model
+----------------------------------------------------
+For group g with n_g observations (effective weight sum), group mean r_bar_g:
+
+Full log-likelihood (ignoring constants):
+  l = -0.5 * [ sum_g { (n_g-1)*log(sigma2) + SS_within_g/sigma2 }      (within-group)
+               + sum_g { log(tau2 + sigma2/n_g) }                        (between-group means)
+               + sum_g { (r_bar_g - mu)^2 / (tau2 + sigma2/n_g) }       (group deviation)
+               + log( sum_g { 1/(tau2 + sigma2/n_g) } ) ]                (REML correction)
+
+where mu = sum_g { r_bar_g / (tau2 + sigma2/n_g) } / sum_g { 1/(tau2 + sigma2/n_g) }
+is the REML grand mean.
 
 References
 ----------
@@ -22,6 +30,7 @@ References
   Biometrics 9(2): 226-252.
 - Patterson & Thompson (1971): Recovery of inter-block information when
   block sizes are unequal. Biometrika 58(3): 545-554.
+- Searle, Casella, McCulloch (1992): Variance Components. Wiley.
 """
 
 from __future__ import annotations
@@ -67,7 +76,7 @@ def _henderson_mom_init(
 
     # Within-group SS
     ss_within = 0.0
-    n_bar_inv_sum = 0.0
+    n_bar_num = 0.0
     for g in groups:
         mask = group_ids == g
         r_g = residuals[mask]
@@ -75,16 +84,20 @@ def _henderson_mom_init(
         w_g_sum = w_g.sum()
         mu_g = np.average(r_g, weights=w_g)
         ss_within += np.sum(w_g * (r_g - mu_g) ** 2)
-        n_bar_inv_sum += (w_g ** 2).sum() / w_g_sum
+        n_bar_num += w_g_sum
+
+    # Effective group size for unbalanced design (Searle 1992, eq 5.30)
+    w_sq_sums = sum(
+        (weights[group_ids == g] ** 2).sum() / weights[group_ids == g].sum()
+        for g in groups
+    )
+    n_bar = (w_total - w_sq_sums / w_total) / max(m - 1, 1)
 
     ss_between = ss_total - ss_within
     dof_within = w_total - m
     dof_between = m - 1
 
     sigma2_init = max(ss_within / max(dof_within, 1.0), 1e-6)
-
-    # n_bar for unbalanced case (harmonic-ish mean of group sizes)
-    n_bar = (w_total - n_bar_inv_sum / w_total) / max(dof_between, 1.0)
     tau2_init = max((ss_between / max(dof_between, 1.0) - sigma2_init) / max(n_bar, 1.0), 0.0)
 
     return sigma2_init, tau2_init
@@ -100,86 +113,70 @@ def _reml_neg_log_likelihood(
     """
     Negative REML log-likelihood for one-way random effects model.
 
-    The REML likelihood marginalises over mu (fixed effect), giving:
+    The full REML log-likelihood (up to a constant):
 
-    -2 * l_REML = sum_g [ n_g * log(sigma2) + log(tau2 + sigma2/n_g_eff)
-                          + (r_bar_g - mu_hat)^2 / (tau2 + sigma2/n_g_eff)
-                          + SS_within_g / sigma2 ]
-                  + log(sum_g n_g_eff / (tau2 + sigma2/n_g_eff))
+      -2 l_REML = sum_g (n_g - 1) log(sigma2) + SS_within_g/sigma2
+                + sum_g log(v_g)
+                + sum_g (r_bar_g - mu_hat)^2 / v_g
+                + log(sum_g 1/v_g)
 
-    where n_g_eff = sum of weights in group g.
+    where v_g = tau2 + sigma2/n_g  (marginal variance of group mean r_bar_g)
+    and   mu_hat is the REML grand mean.
+
+    We parametrise as log(sigma2) and log(tau2) to enforce positivity.
     """
     log_sigma2, log_tau2 = params
     sigma2 = np.exp(log_sigma2)
     tau2 = np.exp(log_tau2)
 
-    if sigma2 < 1e-12 or tau2 < 0:
+    if sigma2 < 1e-12:
         return 1e15
 
-    n = len(residuals)
     ll = 0.0
-    information_sum = 0.0  # for REML correction term
-
-    # Accumulate per-group terms
-    group_means = []
-    group_precisions = []
+    prec_sum = 0.0       # sum_g 1/v_g  (for REML correction)
+    prec_mean_sum = 0.0  # sum_g r_bar_g / v_g  (for grand mean)
 
     for g in groups:
         mask = group_ids == g
         r_g = residuals[mask]
         w_g = weights[mask]
-        n_g = w_g.sum()  # effective group size
+        n_g = float(w_g.sum())
 
-        # Within-group weighted mean
+        # Weighted group mean and within-group SS
         mu_g = np.average(r_g, weights=w_g)
         ss_g = np.sum(w_g * (r_g - mu_g) ** 2)
 
-        # Marginal variance of group mean
-        v_g = tau2 + sigma2 / n_g
+        # Within-group contribution: (n_g - 1)*log(sigma2) + SS_within/sigma2
+        n_g_int = len(r_g)  # number of observations (not weight sum)
+        ll += (n_g_int - 1) * np.log(sigma2) + ss_g / sigma2
 
-        ll += np.log(v_g) + ss_g / sigma2
+        # Marginal variance of group mean (weighted)
+        v_g = tau2 + sigma2 / max(n_g, 1e-9)
+        prec = 1.0 / max(v_g, 1e-12)
 
-        group_means.append(mu_g)
-        group_precisions.append(1.0 / v_g)
-        information_sum += n_g / v_g
+        # Between-group mean contribution: log(v_g) (added below via grand mean)
+        ll += np.log(v_g)
 
-    # Grand mean (weighted by precision)
-    gm = np.array(group_means)
-    gp = np.array(group_precisions)
-    mu_hat = np.sum(gp * gm) / np.sum(gp)
+        prec_sum += prec
+        prec_mean_sum += prec * mu_g
 
-    # Between-group sum
-    for i, g in enumerate(groups):
-        v_g = 1.0 / group_precisions[i]
-        ll += (group_means[i] - mu_hat) ** 2 / v_g
+    # REML grand mean
+    mu_hat = prec_mean_sum / max(prec_sum, 1e-12)
 
-    # REML correction: log|X'V^{-1}X| = log(information_sum)
-    ll += np.log(max(information_sum, 1e-12))
+    # Deviations of group means from grand mean
+    for g in groups:
+        mask = group_ids == g
+        r_g = residuals[mask]
+        w_g = weights[mask]
+        n_g = float(w_g.sum())
+        mu_g = np.average(r_g, weights=w_g)
+        v_g = tau2 + sigma2 / max(n_g, 1e-9)
+        ll += (mu_g - mu_hat) ** 2 / v_g
 
-    # Scale: factor of n * log(sigma2) already partly included above;
-    # add constant within-group terms
-    # We already counted log(v_g) + SS_within/sigma2 per group
-    # Full REML: need to add n*log(2*pi) terms (omit as constant)
+    # REML correction: log|X'V^{-1}X| = log(prec_sum)
+    ll += np.log(max(prec_sum, 1e-12))
 
     return 0.5 * ll
-
-
-def _reml_neg_log_likelihood_tau0(
-    log_sigma2: float,
-    residuals: np.ndarray,
-    weights: np.ndarray,
-) -> float:
-    """
-    Log-likelihood when tau2 = 0 (pooled model, no group effects).
-    Used to check if random effects improve fit.
-    """
-    sigma2 = np.exp(log_sigma2)
-    if sigma2 < 1e-12:
-        return 1e15
-    mu_hat = np.average(residuals, weights=weights)
-    ss = np.sum(weights * (residuals - mu_hat) ** 2)
-    n = len(residuals)
-    return 0.5 * (n * np.log(sigma2) + ss / sigma2)
 
 
 class RandomEffectsEstimator:
@@ -226,7 +223,7 @@ class RandomEffectsEstimator:
         self._sigma2: float | None = None
         self._tau2: float | None = None
         self._mu_hat: float | None = None
-        self._blup_map: dict = {}  # group_id -> blup value
+        self._blup_map: dict | None = None  # None = not fitted
         self._group_stats: dict = {}  # group_id -> (n, mean, Z)
         self._variance_components: VarianceComponents | None = None
         self._group_col: str = "group"
@@ -259,26 +256,31 @@ class RandomEffectsEstimator:
         VarianceComponents
         """
         self._group_col = group_col
+        # Reset blup_map so pre-fit check works
+        self._blup_map = None
         n = len(residuals)
         if weights is None:
             weights = np.ones(n)
         weights = np.asarray(weights, dtype=float)
+        group_ids = np.asarray(group_ids, dtype=str)
 
         # Identify groups meeting min_group_size
         all_groups, counts = np.unique(group_ids, return_counts=True)
         eligible_mask = np.zeros(n, dtype=bool)
         eligible_groups = []
+        self._group_stats = {}
+
         for g, cnt in zip(all_groups, counts):
             obs_mask = group_ids == g
-            w_g = weights[obs_mask].sum()
-            if w_g >= self.min_group_size:
+            w_g = weights[obs_mask]
+            w_g_sum = float(w_g.sum())
+            mu_g = float(np.average(residuals[obs_mask], weights=w_g))
+            if w_g_sum >= self.min_group_size:
                 eligible_mask |= obs_mask
                 eligible_groups.append(g)
             else:
-                # Store as ineligible with Z=0
-                mu_g = float(np.average(residuals[obs_mask], weights=weights[obs_mask]))
                 self._group_stats[g] = {
-                    "n": float(weights[obs_mask].sum()),
+                    "n": w_g_sum,
                     "mean": mu_g,
                     "Z": 0.0,
                 }
@@ -298,6 +300,7 @@ class RandomEffectsEstimator:
             mu_hat = float(np.average(r_elig, weights=w_elig)) if len(r_elig) > 0 else 0.0
             ss = float(np.sum(w_elig * (r_elig - mu_hat) ** 2)) if len(r_elig) > 0 else 0.0
             sigma2 = max(ss / max(len(r_elig) - 1, 1), 1e-6)
+            self._blup_map = {}
             return self._store_result(
                 sigma2=sigma2,
                 tau2=0.0,
@@ -355,6 +358,7 @@ class RandomEffectsEstimator:
                 stacklevel=2,
             )
 
+        self._blup_map = {}
         return self._store_result(
             sigma2=sigma2,
             tau2=tau2,
@@ -412,6 +416,8 @@ class RandomEffectsEstimator:
         self._sigma2 = sigma2
         self._tau2 = tau2
         self._mu_hat = mu_hat
+        if self._blup_map is None:
+            self._blup_map = {}
 
         # Compute BLUPs for eligible groups
         for g in eligible_groups:
@@ -478,8 +484,9 @@ class RandomEffectsEstimator:
 
         blups = np.zeros(len(group_ids))
         for i, g in enumerate(group_ids):
-            if g in self._blup_map:
-                blups[i] = self._blup_map[g]
+            g_str = str(g)
+            if g_str in self._blup_map:
+                blups[i] = self._blup_map[g_str]
             elif not allow_new_groups:
                 raise KeyError(
                     f"Group '{g}' not seen during training and allow_new_groups=False."
@@ -499,4 +506,6 @@ class RandomEffectsEstimator:
     @property
     def blup_map(self) -> dict:
         """Fitted BLUPs: {group_id: blup_value}."""
+        if self._blup_map is None:
+            return {}
         return self._blup_map

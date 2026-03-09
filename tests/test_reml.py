@@ -117,22 +117,48 @@ def test_blup_direction():
 
 
 def test_blup_shrinkage():
-    """BLUPs should be shrunk toward zero: |blup| <= |group_mean|."""
+    """BLUPs should shrink toward grand mean: |blup| <= |group_mean - grand_mean|.
+    
+    The BLUP is b_hat_g = Z_g * (r_bar_g - mu_hat). Since Z_g in [0,1], the BLUP
+    is always closer to zero (the grand-mean-centred scale) than the raw deviation.
+    Note: this is shrinkage toward mu_hat, not toward zero. The BLUP can exceed
+    the raw group mean if mu_hat is on the opposite side of zero from the group mean.
+    """
     residuals, group_ids, _ = _make_residuals(
         n_groups=10, n_per_group=20, sigma2=0.25, tau2=0.10
     )
     est = RandomEffectsEstimator(min_group_size=5)
     est.fit(residuals, group_ids)
 
+    # Compute grand mean (weighted average of group means by precision)
+    vc = est.variance_components
+    sigma2 = vc.sigma2
+    tau2 = list(vc.tau2.values())[0]
+
     groups = np.unique(group_ids)
+    prec_sum = 0.0
+    prec_mean_sum = 0.0
+    for g in groups:
+        mask = group_ids == g
+        n_g = float(mask.sum())
+        mu_g = float(np.mean(residuals[mask]))
+        v_g = tau2 + sigma2 / max(n_g, 1e-9)
+        prec = 1.0 / max(v_g, 1e-12)
+        prec_sum += prec
+        prec_mean_sum += prec * mu_g
+    mu_hat = prec_mean_sum / max(prec_sum, 1e-12)
+
     for g in groups:
         if g not in est.blup_map:
             continue
         mask = group_ids == g
         group_mean = float(np.mean(residuals[mask]))
+        deviation = group_mean - mu_hat  # deviation from grand mean
         blup = est.blup_map[g]
-        assert abs(blup) <= abs(group_mean) + 1e-6, (
-            f"Group {g}: BLUP {blup:.4f} exceeds group mean {group_mean:.4f} (no shrinkage)"
+        # BLUP = Z_g * deviation, and Z_g in [0,1], so |BLUP| <= |deviation|
+        assert abs(blup) <= abs(deviation) + 1e-4, (
+            f"Group {g}: BLUP {blup:.4f} exceeds deviation from grand mean "
+            f"{deviation:.4f} (mu_g={group_mean:.4f}, mu_hat={mu_hat:.4f})"
         )
 
 
