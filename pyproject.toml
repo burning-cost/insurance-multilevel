@@ -40,7 +40,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
-    "polars>=0.20",
+    "polars>=1.0",
     "catboost>=1.2",
     "scipy>=1.10",
     "pyarrow>=23.0.1",
@@ -54,9 +54,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/burningcost/insurance-multilevel"
-Repository = "https://github.com/burningcost/insurance-multilevel"
-Issues = "https://github.com/burningcost/insurance-multilevel/issues"
+Homepage = "https://github.com/burning-cost/insurance-multilevel"
+Repository = "https://github.com/burning-cost/insurance-multilevel"
+Issues = "https://github.com/burning-cost/insurance-multilevel/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/insurance_multilevel"]
