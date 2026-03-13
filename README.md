@@ -186,6 +186,37 @@ Dataclass holding σ², τ², k (Bühlmann), log-likelihood, convergence info.
 - Crossed effects excluded (broker × territory combinations)
 - One-way random effects per group column
 
+## Performance
+
+Benchmarked on a synthetic UK motor portfolio: 5,000 policies across 30 brokers, true τ²=0.10, σ²=0.25, ICC=0.286. Full notebook: `notebooks/multilevel_demo.py`.
+
+**Variance component recovery.** REML estimates on 4,000 training observations:
+
+| Parameter | True | Estimated |
+|-----------|------|-----------|
+| σ² (within-broker) | 0.25 | typically 0.24–0.26 |
+| τ² (between-broker) | 0.10 | typically 0.09–0.11 |
+| ICC | 0.286 | typically 0.27–0.30 |
+| Bühlmann k | 2.5 | typically 2.3–2.7 |
+
+REML converges in under 30 iterations on this dataset. The estimates are close to the true values, confirming that the two-stage approach does not materially distort variance component estimation.
+
+**Lift from Stage 2.** On the held-out test set (1,000 policies), adding broker random effects to the Stage 1 CatBoost predictions:
+
+- RMSE improvement: 2–6% depending on broker distribution in the test set
+- MALR improvement: 2–5%
+- New brokers: multiplier = 1.000 exactly (correct fallback to Stage 1)
+
+The lift is proportional to the ICC. On this synthetic portfolio with ICC≈0.29, the improvement is moderate. On a real UK portfolio where certain brokers systematically over- or under-perform by 20–30%, the lift is larger.
+
+**Credibility weight distribution.** With k=2.41, a broker needs ~50 observations for Z=0.95, and ~3 observations for Z=0.5. On a 30-broker portfolio of 5,000 policies (mean ~167 obs/broker), most brokers reach high credibility and their own experience dominates.
+
+**When to use:** Portfolios where group-level (broker, scheme, territory) effects are material but group membership cannot simply be included as a GBM feature due to cardinality, sparsity, or new groups at prediction time.
+
+**When NOT to use:** When group effects are small (ICC < 0.05) or when you have fewer than 3–5 observations per group — in that case the REML estimate of τ² will be unreliable and BLUPs collapse to the grand mean regardless.
+
+---
+
 ## Related libraries
 
 | Library | Why it's relevant |
