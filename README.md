@@ -232,6 +232,14 @@ The lift is proportional to the ICC. On this synthetic portfolio with ICC≈0.29
 
 [Your Broker Adjustments Are Guesswork](https://burning-cost.github.io/blog/your-broker-adjustments-are-guesswork) — why ad hoc broker loadings fail and how REML random effects give you defensible, data-driven credibility weights.
 
+
+## Related Libraries
+
+| Library | What it does |
+|---------|-------------|
+| [insurance-credibility](https://github.com/burning-cost/insurance-credibility) | Bühlmann-Straub credibility — the closed-form classical alternative when a GBM stage is not needed |
+| [insurance-glm-tools](https://github.com/burning-cost/insurance-glm-tools) | GLM tooling including factor merging — use to reduce dimensionality of the group factor before adding random effects |
+
 ## Licence
 
 MIT
