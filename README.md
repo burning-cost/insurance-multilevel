@@ -14,7 +14,7 @@ The reasons one-hot encoding fails at scale:
 
 What you actually need is **shrinkage**: for a new or low-volume broker, trust the book-wide average. For a high-volume broker with years of data, trust their own experience. The crossover point is determined by how variable brokers are relative to within-group noise.
 
-This is classical Bühlmann-Straub credibility theory, reimplemented as a statistically principled REML random effects model. If you want the classical closed-form version — for scheme pricing or geographic rating without a GBM stage — see [credibility](https://github.com/burning-cost/credibility), which implements `BuhlmannStraub` and `HierarchicalBuhlmannStraub` directly.
+This is classical Bühlmann-Straub credibility theory, reimplemented as a statistically principled REML random effects model. If you want the classical closed-form version — for scheme pricing or geographic rating without a GBM stage — see [insurance-credibility](https://github.com/burning-cost/insurance-credibility), which implements `BuhlmannStraub` and `HierarchicalBuhlmannStraub` directly.
 
 ## The Solution
 
@@ -85,7 +85,7 @@ shape: (47, 11)
 
 The `multiplier` column is what pricing teams use. broker_02 has consistently worse-than-expected experience; apply a 1.184 loading on top of the base premium for policies written through that broker.
 
-The column names — `tau2` (τ², between-group variance), `sigma2` (σ², within-group variance), `k` (Bühlmann's k), `credibility_weight` (Z) — deliberately mirror the notation in classical Bühlmann-Straub theory. See [credibility](https://github.com/burning-cost/credibility) for the closed-form version of the same model, where these parameters are explained in detail.
+The column names — `tau2` (τ², between-group variance), `sigma2` (σ², within-group variance), `k` (Bühlmann's k), `credibility_weight` (Z) — deliberately mirror the notation in classical Bühlmann-Straub theory. See [insurance-credibility](https://github.com/burning-cost/insurance-credibility) for the closed-form version of the same model, where these parameters are explained in detail.
 
 ## Variance Components
 
@@ -221,7 +221,7 @@ The lift is proportional to the ICC. On this synthetic portfolio with ICC≈0.29
 
 | Library | Why it's relevant |
 |---------|------------------|
-| [credibility](https://github.com/burning-cost/credibility) | Bühlmann-Straub closed-form implementation — use this when you don't need a GBM Stage 1 |
+| [insurance-credibility](https://github.com/burning-cost/insurance-credibility) | Bühlmann-Straub closed-form implementation — use this when you don't need a GBM Stage 1 |
 | [shap-relativities](https://github.com/burning-cost/shap-relativities) | Extract rating relativities from the Stage 1 CatBoost model |
 | [insurance-spatial](https://github.com/burning-cost/insurance-spatial) | BYM2 spatial random effects for territory — the geographic equivalent of broker random effects |
 | [insurance-cv](https://github.com/burning-cost/insurance-cv) | Walk-forward cross-validation respecting IBNR structure, needed for validating the Stage 1 model |
