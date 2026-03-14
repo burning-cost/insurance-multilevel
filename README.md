@@ -217,6 +217,11 @@ The lift is proportional to the ICC. On this synthetic portfolio with ICC≈0.29
 
 ---
 
+
+## Databricks Notebook
+
+A ready-to-run Databricks notebook benchmarking this library against standard approaches is available in [burning-cost-examples](https://github.com/burning-cost/burning-cost-examples/blob/main/notebooks/insurance_multilevel_demo.py).
+
 ## Related libraries
 
 | Library | Why it's relevant |
