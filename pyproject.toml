@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-multilevel"
-version = "0.1.1"
+version = "0.1.2"
 description = "Two-stage CatBoost + REML random effects model for insurance pricing with high-cardinality group factors"
 readme = "README.md"
 license = { text = "MIT" }
@@ -24,6 +24,8 @@ keywords = [
     "pricing",
     "broker",
     "scheme",
+    "UK",
+    "personal lines",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -57,6 +59,7 @@ dev = [
 Homepage = "https://github.com/burning-cost/insurance-multilevel"
 Repository = "https://github.com/burning-cost/insurance-multilevel"
 Issues = "https://github.com/burning-cost/insurance-multilevel/issues"
+Documentation = "https://github.com/burning-cost/insurance-multilevel#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/insurance_multilevel"]
