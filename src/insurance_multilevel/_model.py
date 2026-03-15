@@ -18,6 +18,9 @@ Design decisions
    (e.g., policy within scheme within broker) are supported by fitting
    separate estimators per level and composing the BLUP adjustments. Crossed
    effects (broker x territory) are excluded from V1.
+   When multiple group columns are fitted, each level's estimator sees residuals
+   with the previous level's BLUPs subtracted. This prevents double-counting
+   of group signal across levels (B2 fix).
 
 4. min_group_size=5 is the default threshold below which a group gets Z=0.
    Groups with n=1 cannot separate their group effect from residual noise;
@@ -193,21 +196,32 @@ class MultilevelPricingModel:
         # Protect against non-positive predictions (can happen with RMSE loss)
         f_hat = np.clip(f_hat, _TINY, None)
 
-        # Stage 2: REML random effects on log-ratio residuals per group level
-        residuals = np.log(np.clip(y_arr, _TINY, None) / f_hat)
+        # Stage 2: REML random effects on log-ratio residuals per group level.
+        # FIX B2: When fitting multiple levels, subtract the previous level's
+        # BLUPs from the residuals before fitting the next level. This prevents
+        # double-counting overlap between levels. Each estimator therefore sees
+        # only the residual variation not yet explained by higher levels.
+        base_residuals = np.log(np.clip(y_arr, _TINY, None) / f_hat)
 
         self._re_estimators = {}
         self._variance_components = {}
 
+        # running_blup tracks the cumulative log-scale BLUP adjustment from
+        # all previously fitted levels. Each new level fits on what remains.
+        running_blup = np.zeros(len(y_arr))
+
         for gcol in group_cols:
             g_arr = X[gcol].to_numpy().astype(str)
+            level_residuals = base_residuals - running_blup
             est = RandomEffectsEstimator(
                 reml=self.reml,
                 min_group_size=self.min_group_size,
             )
-            vc = est.fit(residuals, g_arr, w_arr, group_col=gcol)
+            vc = est.fit(level_residuals, g_arr, w_arr, group_col=gcol)
             self._re_estimators[gcol] = est
             self._variance_components[gcol] = vc
+            # Accumulate this level's BLUPs so the next level sees de-meaned residuals
+            running_blup += est.predict_blup(g_arr, allow_new_groups=True)
 
         self._fitted = True
         self._credibility_df = None  # invalidate cache

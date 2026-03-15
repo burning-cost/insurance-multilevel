@@ -57,17 +57,19 @@ def _henderson_mom_init(
 
     This gives decent starting values without any iteration. The classical
     ANOVA decomposition:
-        SS_within  / (n - m)     -> sigma2
+        SS_within  / (n_obs - m)     -> sigma2
         [SS_between/(m-1) - sigma2/n_bar] -> tau2  (clamped to 0)
 
-    For weighted case we use the weighted SS decomposition.
+    For weighted case we use the weighted SS decomposition. dof_within uses
+    observation count (not weight sum) per Henderson (1953). n_bar follows
+    Searle (1992) eq 5.30: n_bar = (W - sum_g(W_g^2/W)) / (m-1).
     """
-    groups = np.unique(group_ids)
+    groups, counts = np.unique(group_ids, return_counts=True)
     m = len(groups)
-    n = len(residuals)
+    n_total_obs = len(residuals)
 
     if weights is None:
-        weights = np.ones(n)
+        weights = np.ones(n_total_obs)
 
     w_total = weights.sum()
     mu_hat = np.average(residuals, weights=weights)
@@ -76,25 +78,23 @@ def _henderson_mom_init(
 
     # Within-group SS
     ss_within = 0.0
-    n_bar_num = 0.0
     for g in groups:
         mask = group_ids == g
         r_g = residuals[mask]
         w_g = weights[mask]
-        w_g_sum = w_g.sum()
         mu_g = np.average(r_g, weights=w_g)
         ss_within += np.sum(w_g * (r_g - mu_g) ** 2)
-        n_bar_num += w_g_sum
 
-    # Effective group size for unbalanced design (Searle 1992, eq 5.30)
-    w_sq_sums = sum(
-        (weights[group_ids == g] ** 2).sum() / weights[group_ids == g].sum()
-        for g in groups
-    )
-    n_bar = (w_total - w_sq_sums / w_total) / max(m - 1, 1)
+    # Effective group size for unbalanced design.
+    # Searle (1992) eq 5.30: n_bar = (W - sum_g(W_g^2) / W) / (m - 1)
+    # where W = total weight sum, W_g = per-group weight sum.
+    # FIX B5: was dividing W_g^2 element-wise then summing, giving wrong formula.
+    w_g_sums = np.array([weights[group_ids == g].sum() for g in groups])
+    n_bar = (w_total - (w_g_sums ** 2).sum() / w_total) / max(m - 1, 1)
 
     ss_between = ss_total - ss_within
-    dof_within = w_total - m
+    # FIX B4: use observation count for dof_within, not weight sum.
+    dof_within = n_total_obs - m
     dof_between = m - 1
 
     sigma2_init = max(ss_within / max(dof_within, 1.0), 1e-6)
@@ -109,19 +109,27 @@ def _reml_neg_log_likelihood(
     group_ids: np.ndarray,
     weights: np.ndarray,
     groups: np.ndarray,
+    reml: bool,
 ) -> float:
     """
-    Negative REML log-likelihood for one-way random effects model.
+    Negative REML (or ML) log-likelihood for one-way random effects model.
 
     The full REML log-likelihood (up to a constant):
 
       -2 l_REML = sum_g (n_g - 1) log(sigma2) + SS_within_g/sigma2
                 + sum_g log(v_g)
                 + sum_g (r_bar_g - mu_hat)^2 / v_g
-                + log(sum_g 1/v_g)
+                + log(sum_g 1/v_g)   [REML correction only]
 
-    where v_g = tau2 + sigma2/n_g  (marginal variance of group mean r_bar_g)
-    and   mu_hat is the REML grand mean.
+    where n_g = w_g.sum() (effective weight sum), v_g = tau2 + sigma2/n_g
+    (marginal variance of group mean r_bar_g), and mu_hat is the REML grand
+    mean.
+
+    FIX B1: Within-group dof uses n_g (weight sum) consistently, not the raw
+    observation count n_g_int. The marginal variance v_g = tau2 + sigma2/n_g
+    uses the weight sum so the within-group term must match.
+
+    FIX B3: The REML correction log(prec_sum) is only added when reml=True.
 
     We parametrise as log(sigma2) and log(tau2) to enforce positivity.
     """
@@ -140,21 +148,21 @@ def _reml_neg_log_likelihood(
         mask = group_ids == g
         r_g = residuals[mask]
         w_g = weights[mask]
-        n_g = float(w_g.sum())
+        n_g = float(w_g.sum())  # effective weight sum
 
         # Weighted group mean and within-group SS
         mu_g = np.average(r_g, weights=w_g)
         ss_g = np.sum(w_g * (r_g - mu_g) ** 2)
 
         # Within-group contribution: (n_g - 1)*log(sigma2) + SS_within/sigma2
-        n_g_int = len(r_g)  # number of observations (not weight sum)
-        ll += (n_g_int - 1) * np.log(sigma2) + ss_g / sigma2
+        # FIX B1: use n_g (weight sum) consistently — not len(r_g).
+        ll += (n_g - 1) * np.log(sigma2) + ss_g / sigma2
 
         # Marginal variance of group mean (weighted)
         v_g = tau2 + sigma2 / max(n_g, 1e-9)
         prec = 1.0 / max(v_g, 1e-12)
 
-        # Between-group mean contribution: log(v_g) (added below via grand mean)
+        # Between-group mean contribution: log(v_g)
         ll += np.log(v_g)
 
         prec_sum += prec
@@ -173,8 +181,9 @@ def _reml_neg_log_likelihood(
         v_g = tau2 + sigma2 / max(n_g, 1e-9)
         ll += (mu_g - mu_hat) ** 2 / v_g
 
-    # REML correction: log|X'V^{-1}X| = log(prec_sum)
-    ll += np.log(max(prec_sum, 1e-12))
+    # FIX B3: REML correction log|X'V^{-1}X| = log(prec_sum) only when reml=True.
+    if reml:
+        ll += np.log(max(prec_sum, 1e-12))
 
     return 0.5 * ll
 
@@ -264,7 +273,8 @@ class RandomEffectsEstimator:
         weights = np.asarray(weights, dtype=float)
         group_ids = np.asarray(group_ids, dtype=str)
 
-        # Identify groups meeting min_group_size
+        # Identify groups meeting min_group_size (by observation count).
+        # FIX B6: compare observation count (cnt) not weight sum.
         all_groups, counts = np.unique(group_ids, return_counts=True)
         eligible_mask = np.zeros(n, dtype=bool)
         eligible_groups = []
@@ -275,7 +285,8 @@ class RandomEffectsEstimator:
             w_g = weights[obs_mask]
             w_g_sum = float(w_g.sum())
             mu_g = float(np.average(residuals[obs_mask], weights=w_g))
-            if w_g_sum >= self.min_group_size:
+            # FIX B6: use observation count (cnt) not weight sum (w_g_sum)
+            if cnt >= self.min_group_size:
                 eligible_mask |= obs_mask
                 eligible_groups.append(g)
             else:
@@ -325,7 +336,7 @@ class RandomEffectsEstimator:
         # Initialise from Henderson moments
         sigma2_init, tau2_init = _henderson_mom_init(r_elig, g_elig, w_elig)
 
-        # Optimise REML log-likelihood
+        # Optimise REML (or ML) log-likelihood
         x0 = np.array([
             np.log(max(sigma2_init, 1e-6)),
             np.log(max(tau2_init, 1e-6)),
@@ -334,7 +345,7 @@ class RandomEffectsEstimator:
         result = minimize(
             fun=_reml_neg_log_likelihood,
             x0=x0,
-            args=(r_elig, g_elig, w_elig, eligible_groups),
+            args=(r_elig, g_elig, w_elig, eligible_groups, self.reml),
             method="L-BFGS-B",
             options={"maxiter": self.max_iter, "ftol": self.tol, "gtol": self.tol * 0.1},
         )
