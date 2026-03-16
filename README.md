@@ -188,36 +188,51 @@ Dataclass holding σ², τ², k (Bühlmann), log-likelihood, convergence info.
 
 ## Performance
 
-Benchmarked on a synthetic UK motor portfolio: 5,000 policies across 30 brokers, true τ²=0.10, σ²=0.25, ICC=0.286. Full notebook: `notebooks/multilevel_demo.py`.
+Benchmarked on a synthetic UK motor portfolio: 8,000 policies across 200 occupation codes (40 thick groups / 160 thin groups), true sigma_u=0.30 (between-group std), true sigma_e=0.50 (within-group std), ICC=0.36. Three approaches compared on a held-out 20% test set. Benchmark run post P0 fixes on Databricks serverless.
 
-**Variance component recovery.** REML estimates on 4,000 training observations:
+**Variance component recovery:**
 
 | Parameter | True | Estimated |
 |-----------|------|-----------|
-| σ² (within-broker) | 0.25 | typically 0.24–0.26 |
-| τ² (between-broker) | 0.10 | typically 0.09–0.11 |
-| ICC | 0.286 | typically 0.27–0.30 |
-| Bühlmann k | 2.5 | typically 2.3–2.7 |
+| sigma2 (within-group) | 0.2500 | 0.1532 |
+| tau2 (between-group) | 0.0900 | 0.0761 |
+| ICC | 0.360 | 0.332 |
 
-REML converges in under 30 iterations on this dataset. The estimates are close to the true values, confirming that the two-stage approach does not materially distort variance component estimation.
+REML under-estimates both variance components on this dataset. The within-group sigma2 is substantially lower than the truth, likely because the Stage 1 CatBoost model absorbs much of the variance before the REML step. The estimates converge better when Stage 1 is a weak model or the fixed effects are excluded. Despite this attenuation, the Stage 2 lift is positive and substantial.
 
-**Lift from Stage 2.** On the held-out test set (1,000 policies), adding broker random effects to the Stage 1 CatBoost predictions:
+**Holdout gamma deviance (lower = better):**
 
-- RMSE improvement: 2–6% depending on broker distribution in the test set
-- MALR improvement: 2–5%
-- New brokers: multiplier = 1.000 exactly (correct fallback to Stage 1)
+| Method | Gamma Deviance |
+|--------|----------------|
+| No group effect (CatBoost on X only) | 0.338092 |
+| One-hot encoding of group | 0.272967 |
+| MultilevelPricingModel (CatBoost + REML) | 0.272280 |
+| Stage 1 only (CatBoost) vs Full model lift | +15.93% reduction |
 
-The lift is proportional to the ICC. On this synthetic portfolio with ICC≈0.29, the improvement is moderate. On a real UK portfolio where certain brokers systematically over- or under-perform by 20–30%, the lift is larger.
+MultilevelPricingModel beats one-hot encoding on deviance (marginally) and outperforms no-group by 19.4%. The Stage 2 lift of 15.93% is large because ICC=0.33 — when a third of the variance is attributable to group membership, ignoring group structure is expensive.
 
-**Credibility weight distribution.** With k=2.41, a broker needs ~50 observations for Z=0.95, and ~3 observations for Z=0.5. On a 30-broker portfolio of 5,000 policies (mean ~167 obs/broker), most brokers reach high credibility and their own experience dominates.
+**MAPE by group thickness:**
 
-**When to use:** Portfolios where group-level (broker, scheme, territory) effects are material but group membership cannot simply be included as a GBM feature due to cardinality, sparsity, or new groups at prediction time.
+| Method | Thin groups MAPE | Thick groups MAPE |
+|--------|-----------------|-------------------|
+| No group effect | 68.35% | 62.46% |
+| One-hot encoding | 66.09% | 51.11% |
+| MultilevelPricingModel (REML) | 63.55% | 52.85% |
 
-**When NOT to use:** When group effects are small (ICC < 0.05) or when you have fewer than 3–5 observations per group — in that case the REML estimate of τ² will be unreliable and BLUPs collapse to the grand mean regardless.
+MultilevelPricingModel achieves the lowest MAPE on thin groups (63.55% vs 66.09% for one-hot). One-hot encoding slightly wins on thick groups because with enough data the one-hot coefficients converge to the correct values, and the REML shrinkage marginally over-regularises. The difference is 1.7pp — within noise. On thin groups the gap is decisive: one-hot overfits noisy 10-policy estimates; REML shrinks them appropriately.
 
----
+**Group effect recovery:** Pearson r(BLUP, true effect)=0.7291 (target: >0.6). BLUP adjustments correlate strongly with the planted true occupation effects.
 
+**Credibility weight distribution:**
+- Thin groups (<15 exposure): mean Z=0.38 (heavily shrunk to portfolio mean)
+- Medium groups (15-80 exposure): mean Z=0.97
+- Thick groups (>=80 exposure): mean Z=0.98
 
+ICC=0.33. The lift is substantial whenever occupation code effects are real. On a portfolio where certain occupations over-perform by 15-20%, this pays for itself.
+
+**When to use:** Portfolios where group-level (broker, scheme, territory, occupation) effects are material but group membership cannot simply be included as a GBM feature due to cardinality, sparsity, or new groups at prediction time.
+
+**When NOT to use:** When group effects are small (ICC < 0.05), or when you have fewer than 3-5 observations per group — BLUPs collapse to the grand mean and Stage 2 adds no lift. If you have 10+ observations per group and no new-group problem, one-hot encoding is a reasonable substitute.
 ## Databricks Notebook
 
 A ready-to-run Databricks notebook benchmarking this library against standard approaches is available in [burning-cost-examples](https://github.com/burning-cost/burning-cost-examples/blob/main/notebooks/insurance_multilevel_demo.py).
