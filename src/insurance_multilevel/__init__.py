@@ -39,7 +39,7 @@ from ._diagnostics import (
     lift_from_random_effects,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 __all__ = [
     "MultilevelPricingModel",

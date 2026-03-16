@@ -79,8 +79,10 @@ class MultilevelPricingModel:
         Column names to treat as random effects levels. Order matters for
         nested models: put the highest level first (e.g., ["broker", "scheme"]).
     min_group_size : int
-        Groups with effective observation count below this threshold are
-        excluded from REML and assigned credibility weight Z=0. Default 5.
+        Groups whose total exposure weight (sum of the weights array passed to
+        fit()) is below this threshold are excluded from REML and assigned
+        credibility weight Z=0. Default 5. When weights=None every observation
+        has weight 1, so this is equivalent to a minimum observation count.
     reml : bool
         Use REML (True, default) vs. ML (False). REML is almost always
         correct for variance component estimation.

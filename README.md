@@ -72,6 +72,10 @@ print(summary)
 ```
 
 ```
+# shape: (47, 11) — one row per (level, group) combination.
+# With random_effects=["broker_id", "scheme_id"] and 30 brokers + 17 schemes,
+# you get 47 rows (30 broker-level rows + 17 scheme-level rows), each with its
+# own variance components estimated at that level.
 shape: (47, 11)
 ┌───────────┬─────────────┬────────┬────────────┬────────┬────────────┬───────────────────┬───────┬────────┬──────┬──────────┐
 │ level     ┆ group       ┆ n_obs  ┆ group_mean ┆ blup   ┆ multiplier ┆ credibility_weight┆ tau2  ┆ sigma2 ┆ k    ┆ eligible │
@@ -252,13 +256,6 @@ A ready-to-run Databricks notebook benchmarking this library against standard ap
 
 [Your Broker Adjustments Are Guesswork](https://burning-cost.github.io/blog/your-broker-adjustments-are-guesswork) — why ad hoc broker loadings fail and how REML random effects give you defensible, data-driven credibility weights.
 
-
-## Related Libraries
-
-| Library | What it does |
-|---------|-------------|
-| [insurance-credibility](https://github.com/burning-cost/insurance-credibility) | Bühlmann-Straub credibility — the closed-form classical alternative when a GBM stage is not needed |
-| [insurance-glm-tools](https://github.com/burning-cost/insurance-glm-tools) | GLM tooling including factor merging — use to reduce dimensionality of the group factor before adding random effects |
 
 ## Licence
 

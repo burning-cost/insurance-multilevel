@@ -13,7 +13,7 @@ unbiased estimates.
 
 REML log-likelihood for one-way random effects model
 ----------------------------------------------------
-For group g with n_g observations (effective weight sum), group mean r_bar_g:
+For group g with n_g effective weight sum (total exposure for the group), group mean r_bar_g:
 
 Full log-likelihood (ignoring constants):
   l = -0.5 * [ sum_g { (n_g-1)*log(sigma2) + SS_within_g/sigma2 }      (within-group)
@@ -208,8 +208,10 @@ class RandomEffectsEstimator:
         If True, use REML (recommended). If False, use ML (underestimates
         tau2 but is useful for likelihood ratio tests).
     min_group_size : int
-        Groups with fewer observations than this are excluded from variance
-        component estimation and assigned Z=0 (no credibility).
+        Groups whose total exposure weight (sum of weights for that group) is
+        below this threshold are excluded from variance component estimation
+        and assigned Z=0 (no credibility). When weights are unit (unweighted),
+        this is equivalent to a minimum number of observations.
     max_iter : int
         Maximum number of L-BFGS-B iterations.
     tol : float
