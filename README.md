@@ -192,7 +192,7 @@ Dataclass holding σ², τ², k (Bühlmann), log-likelihood, convergence info.
 
 ## Performance
 
-Benchmarked on a synthetic UK motor portfolio: 8,000 policies across 200 occupation codes (40 thick groups / 160 thin groups), true sigma_u=0.30 (between-group std), true sigma_e=0.50 (within-group std), ICC=0.36. Three approaches compared on a held-out 20% test set. Benchmark run post P0 fixes on Databricks serverless.
+Benchmarked on Databricks (2026-03-16) on a synthetic UK motor portfolio: 8,000 policies across 200 occupation codes (40 thick groups / 160 thin groups), true sigma_u=0.30 (between-group std), true sigma_e=0.50 (within-group std), ICC=0.36. Three approaches compared on a held-out 20% test set. See `benchmarks/benchmark.py` for the full script.
 
 **Variance component recovery:**
 
@@ -237,6 +237,7 @@ ICC=0.33. The lift is substantial whenever occupation code effects are real. On 
 **When to use:** Portfolios where group-level (broker, scheme, territory, occupation) effects are material but group membership cannot simply be included as a GBM feature due to cardinality, sparsity, or new groups at prediction time.
 
 **When NOT to use:** When group effects are small (ICC < 0.05), or when you have fewer than 3-5 observations per group — BLUPs collapse to the grand mean and Stage 2 adds no lift. If you have 10+ observations per group and no new-group problem, one-hot encoding is a reasonable substitute.
+
 ## Databricks Notebook
 
 A ready-to-run Databricks notebook benchmarking this library against standard approaches is available in [burning-cost-examples](https://github.com/burning-cost/burning-cost-examples/blob/main/notebooks/insurance_multilevel_demo.py).
