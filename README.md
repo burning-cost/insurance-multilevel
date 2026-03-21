@@ -46,7 +46,7 @@ Z_g = τ² / (τ² + σ²/n_g)        (Bühlmann credibility weight)
 ## Installation
 
 ```bash
-pip install insurance-multilevel
+uv add insurance-multilevel
 ```
 
 > 💬 Questions or feedback? Start a [Discussion](https://github.com/burning-cost/insurance-multilevel/discussions). Found it useful? A ⭐ helps others find it.
