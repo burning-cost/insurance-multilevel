@@ -3,6 +3,8 @@
 
 Two-stage CatBoost + REML random effects for insurance pricing with high-cardinality group factors.
 
+**Blog post:** [Your Group Factors Are Not All Worth Modelling](https://burning-cost.github.io/2027/03/15/multilevel-group-factors/)
+
 ## The Problem
 
 UK personal lines pricing teams face a specific structural problem: portfolios are distributed through hundreds of brokers, schemes, and affinity partners. These groups differ systematically — broker A has an older, lower-risk customer base; broker B has young drivers; scheme C operates in flood-prone postcodes. But you cannot capture this by throwing broker IDs into a GBM.
@@ -46,6 +48,8 @@ Z_g = τ² / (τ² + σ²/n_g)        (Bühlmann credibility weight)
 ```bash
 pip install insurance-multilevel
 ```
+
+> 💬 Questions or feedback? Start a [Discussion](https://github.com/burning-cost/insurance-multilevel/discussions). Found it useful? A ⭐ helps others find it.
 
 ## Quick Start
 
