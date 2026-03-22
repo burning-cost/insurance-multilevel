@@ -158,6 +158,17 @@ class MultilevelPricingModel:
         Returns
         -------
         self
+
+        Raises
+        ------
+        ValueError
+            If any value of y is <= 0. This model computes log(y / f_hat)
+            as residuals, which is undefined for non-positive y. This means
+            raw claim counts (including zeros) cannot be used directly — you
+            must use a positive response such as claim frequency (claims/exposure),
+            pure premium (loss/exposure), or severity (conditional on a claim).
+            For zero-inflated count data, model frequency and severity separately
+            and combine the predictions.
         """
         group_cols = self._resolve_group_cols(group_cols)
         y_arr = _to_numpy(y, "y")
@@ -290,7 +301,8 @@ class MultilevelPricingModel:
         pl.DataFrame with columns:
             level      : str   — group column name
             group      : str   — group identifier
-            n_obs      : float — sum of weights in group
+            exposure_sum : float — sum of exposure weights in group
+            n_obs      : int   — actual observation count
             group_mean : float — weighted mean log-ratio residual
             blup       : float — BLUP adjustment (log scale)
             multiplier : float — exp(blup), multiplicative premium factor
@@ -323,7 +335,8 @@ class MultilevelPricingModel:
                 rows.append({
                     "level": gcol,
                     "group": str(gid),
-                    "n_obs": stats["n"],
+                    "exposure_sum": stats["n"],
+                    "n_obs": stats.get("n_obs", 0),
                     "group_mean": stats["mean"],
                     "blup": blup_val,
                     "multiplier": float(np.exp(blup_val)),
@@ -338,7 +351,8 @@ class MultilevelPricingModel:
                 frame = pl.DataFrame(rows, schema={
                     "level": pl.Utf8,
                     "group": pl.Utf8,
-                    "n_obs": pl.Float64,
+                    "exposure_sum": pl.Float64,
+                    "n_obs": pl.Int64,
                     "group_mean": pl.Float64,
                     "blup": pl.Float64,
                     "multiplier": pl.Float64,
@@ -354,7 +368,8 @@ class MultilevelPricingModel:
             return pl.DataFrame(schema={
                 "level": pl.Utf8,
                 "group": pl.Utf8,
-                "n_obs": pl.Float64,
+                "exposure_sum": pl.Float64,
+                "n_obs": pl.Int64,
                 "group_mean": pl.Float64,
                 "blup": pl.Float64,
                 "multiplier": pl.Float64,

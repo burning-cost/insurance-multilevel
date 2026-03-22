@@ -150,16 +150,19 @@ def groups_needing_data(
 
     ratio = target_z / (1 - target_z)
 
+    # n_target is in the same units as exposure_sum (weight sum), since k = sigma2/tau2
+    # is estimated from the weighted data. The comparison tells you how many more
+    # exposure-weight units a group needs to reach the target credibility level.
     return (
         credibility_df
         .with_columns([
             (pl.col("k") * ratio).alias("n_target"),
         ])
         .with_columns([
-            (pl.col("n_target") - pl.col("n_obs")).clip(lower_bound=0).alias("n_additional"),
+            (pl.col("n_target") - pl.col("exposure_sum")).clip(lower_bound=0).alias("n_additional"),
         ])
         .select([
-            "level", "group", "n_obs", "credibility_weight", "n_target", "n_additional",
+            "level", "group", "n_obs", "exposure_sum", "credibility_weight", "n_target", "n_additional",
         ])
         .sort(["level", "n_additional"], descending=[False, True])
     )

@@ -293,7 +293,8 @@ class RandomEffectsEstimator:
                 eligible_groups.append(g)
             else:
                 self._group_stats[g] = {
-                    "n": w_g_sum,
+                    "n": w_g_sum,        # sum of exposure weights
+                    "n_obs": int(cnt),   # actual observation count
                     "mean": mu_g,
                     "Z": 0.0,
                 }
@@ -447,8 +448,10 @@ class RandomEffectsEstimator:
 
             blup_g = Z_g * (mu_g - mu_hat)
             self._blup_map[g] = blup_g
+            n_obs_g = int(np.sum(group_ids == g))
             self._group_stats[g] = {
-                "n": n_g,
+                "n": n_g,              # sum of exposure weights
+                "n_obs": n_obs_g,      # actual observation count
                 "mean": mu_g,
                 "Z": Z_g,
             }

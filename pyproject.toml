@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-multilevel"
-version = "0.1.2"
+version = "0.1.3"
 description = "Two-stage CatBoost + REML random effects model for insurance pricing with high-cardinality group factors"
 readme = "README.md"
 license = "MIT"

@@ -36,7 +36,8 @@ def sample_credibility_df() -> pl.DataFrame:
     return pl.DataFrame({
         "level": ["broker_id"] * 5,
         "group": ["B1", "B2", "B3", "B4", "B5"],
-        "n_obs": [500.0, 200.0, 50.0, 20.0, 8.0],
+        "exposure_sum": [500.0, 200.0, 50.0, 20.0, 8.0],
+        "n_obs": [480, 190, 48, 19, 8],
         "group_mean": [0.1, -0.05, 0.2, -0.1, 0.05],
         "blup": [0.07, -0.03, 0.12, -0.05, 0.02],
         "multiplier": [1.07, 0.97, 1.13, 0.95, 1.02],
@@ -167,6 +168,8 @@ def test_groups_needing_data_schema(sample_credibility_df):
     result = groups_needing_data(sample_credibility_df, target_z=0.8)
     assert "n_target" in result.columns
     assert "n_additional" in result.columns
+    assert "exposure_sum" in result.columns
+    assert "n_obs" in result.columns
 
 
 def test_groups_needing_data_already_there(sample_credibility_df):
@@ -178,8 +181,8 @@ def test_groups_needing_data_already_there(sample_credibility_df):
 
 
 def test_groups_needing_data_invalid_target():
-    df = pl.DataFrame({"level": ["b"], "group": ["b"], "n_obs": [10.0],
-                       "credibility_weight": [0.5], "k": [2.5]})
+    df = pl.DataFrame({"level": ["b"], "group": ["b"], "exposure_sum": [10.0],
+                       "n_obs": [10], "credibility_weight": [0.5], "k": [2.5]})
     with pytest.raises(ValueError, match="target_z must be strictly"):
         groups_needing_data(df, target_z=1.0)
 
