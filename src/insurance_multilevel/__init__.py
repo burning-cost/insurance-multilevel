@@ -39,7 +39,12 @@ from ._diagnostics import (
     lift_from_random_effects,
 )
 
-__version__ = "0.1.2"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("insurance-multilevel")
+except PackageNotFoundError:
+    __version__ = "0.0.0"  # not installed
 
 __all__ = [
     "MultilevelPricingModel",
