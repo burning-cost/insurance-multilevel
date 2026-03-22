@@ -72,7 +72,7 @@ def test_credibility_summary_schema(synthetic_insurance_data):
     summary = model.credibility_summary()
 
     expected_cols = {
-        "level", "group", "n_obs", "group_mean", "blup", "multiplier",
+        "level", "group", "exposure_sum", "n_obs", "group_mean", "blup", "multiplier",
         "credibility_weight", "tau2", "sigma2", "k", "eligible",
     }
     assert set(summary.columns) == expected_cols
