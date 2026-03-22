@@ -7,7 +7,7 @@ name = "insurance-multilevel"
 version = "0.1.2"
 description = "Two-stage CatBoost + REML random effects model for insurance pricing with high-cardinality group factors"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Burning Cost", email = "pricing.frontier@gmail.com" },
 ]
