@@ -86,7 +86,7 @@ def variance_decomposition(
         })
 
     return pl.DataFrame(rows, schema={
-        "level": pl.Utf8,
+        "level": pl.String,
         "tau2": pl.Float64,
         "sigma2": pl.Float64,
         "icc": pl.Float64,

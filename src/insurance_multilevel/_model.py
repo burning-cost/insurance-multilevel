@@ -349,8 +349,8 @@ class MultilevelPricingModel:
 
             if rows:
                 frame = pl.DataFrame(rows, schema={
-                    "level": pl.Utf8,
-                    "group": pl.Utf8,
+                    "level": pl.String,
+                    "group": pl.String,
                     "exposure_sum": pl.Float64,
                     "n_obs": pl.Int64,
                     "group_mean": pl.Float64,
@@ -366,8 +366,8 @@ class MultilevelPricingModel:
 
         if not frames:
             return pl.DataFrame(schema={
-                "level": pl.Utf8,
-                "group": pl.Utf8,
+                "level": pl.String,
+                "group": pl.String,
                 "exposure_sum": pl.Float64,
                 "n_obs": pl.Int64,
                 "group_mean": pl.Float64,
@@ -472,6 +472,6 @@ def _find_cat_feature_indices(X: pl.DataFrame) -> list[int]:
     """Return indices of string/categorical columns for CatBoost."""
     indices = []
     for i, dtype in enumerate(X.dtypes):
-        if dtype in (pl.Utf8, pl.Categorical, pl.String):
+        if dtype in (pl.String, pl.Categorical, pl.String):
             indices.append(i)
     return indices
