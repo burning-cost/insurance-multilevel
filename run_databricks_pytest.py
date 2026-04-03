@@ -61,6 +61,8 @@ test_files = {
     "test_model.py":        read_file(f"{BASE}/tests/test_model.py"),
     "test_diagnostics.py":  read_file(f"{BASE}/tests/test_diagnostics.py"),
     "test_bug_fixes.py":    read_file(f"{BASE}/tests/test_bug_fixes.py"),
+    "test_bug_fixes_batch3.py": read_file(f"{BASE}/tests/test_bug_fixes_batch3.py"),
+    "test_coverage_april2026.py": read_file(f"{BASE}/tests/test_coverage_april2026.py"),
 }
 
 all_files = {**src_files, **test_files}
